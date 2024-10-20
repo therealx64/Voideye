@@ -1,0 +1,163 @@
+player = game.Players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Create the tool
+local function createTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "voideye"
+    tool.RequiresHandle = true
+
+    -- Create a handle for the tool
+    local handle = Instance.new("Part")
+    handle.Size = Vector3.new(1, 1, 1)  -- Adjust size as needed
+    handle.Anchored = false
+    handle.CanCollide = false
+    handle.Name = "Handle"
+    handle.Transparency = 1  -- Make the handle transparent
+    handle.Parent = tool
+
+    -- Add the tool to the player's backpack
+    tool.Parent = player.Backpack
+
+    -- Setup animation
+    local animationId = "14985607491"  -- Your animation ID
+    local teleportPosition = Vector3.new(3777, 1959, 6812)  -- Updated Z-coordinate
+
+    -- Function to create a scrollable GUI listing usernames
+    local function createUsernameGUI()
+        -- Create ScreenGui
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Parent = player.PlayerGui
+        screenGui.Name = "UsernameListGui"
+
+        -- Create ScrollingFrame to hold the player names
+        local scrollingFrame = Instance.new("ScrollingFrame")
+        scrollingFrame.Size = UDim2.new(0.5, 0, 0.7, 0)  -- Make the frame big enough to hold all the names
+        scrollingFrame.Position = UDim2.new(0.25, 0, 0.15, 0)  -- Center the frame
+        scrollingFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        scrollingFrame.BorderSizePixel = 0
+        scrollingFrame.ScrollBarThickness = 8  -- Set scrollbar thickness
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)  -- Will adjust dynamically based on content size
+        scrollingFrame.Parent = screenGui
+
+        -- Create a layout for the player names
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = scrollingFrame
+        layout.FillDirection = Enum.FillDirection.Vertical
+        layout.Padding = UDim.new(0, 5)
+
+        -- Function to highlight a player
+        local function highlightPlayer(targetPlayer)
+            -- Remove any existing highlight for all players
+            for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+                local char = otherPlayer.Character
+                if char then
+                    local highlight = char:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+            end
+
+            -- Highlight the selected player
+            if targetPlayer.Character then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "Highlight"
+                highlight.Parent = targetPlayer.Character
+            end
+
+            -- Remove the highlight if either you or the selected player dies
+            local function onDeath()
+                if targetPlayer.Character then
+                    local highlight = targetPlayer.Character:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+            end
+
+            -- Connect death events
+            player.Character.Humanoid.Died:Connect(onDeath)
+            targetPlayer.Character.Humanoid.Died:Connect(onDeath)
+
+            -- Destroy the GUI after selection
+            screenGui:Destroy()
+        end
+
+        -- Add buttons for each player
+        for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+            local button = Instance.new("TextButton")
+            button.Text = otherPlayer.Name
+            button.Size = UDim2.new(1, 0, 0, 30)
+            button.Parent = scrollingFrame
+
+            -- Highlight the player when button is clicked
+            button.MouseButton1Click:Connect(function()
+                highlightPlayer(otherPlayer)
+            end)
+        end
+
+        -- Adjust the canvas size based on the content (number of buttons)
+        local totalHeight = #game.Players:GetPlayers() * 35  -- Each button is 30 pixels + 5 pixels padding
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    end
+
+    -- Function to handle tool activation
+    local function onActivated()
+        local character = player.Character
+        local humanoid = character:FindFirstChild("Humanoid")
+
+        if humanoid then
+            -- Load and play the animation
+            local animation = Instance.new("Animation")
+            animation.AnimationId = "rbxassetid://" .. animationId
+            local animator = humanoid:FindFirstChild("Animator")
+
+            if not animator then
+                animator = Instance.new("Animator")
+                animator.Parent = humanoid
+            end
+
+            local animationTrack = animator:LoadAnimation(animation)
+            animationTrack:Play()
+
+            -- Variable to track if the player took damage
+            local tookDamage = false
+
+            -- Function to handle taking damage
+            local function onHealthChanged()
+                if humanoid.Health < humanoid.MaxHealth then
+                    tookDamage = true
+                    if animationTrack.IsPlaying then
+                        animationTrack:Stop()  -- Stop the animation if damage is taken
+                    end
+                end
+            end
+
+            humanoid.HealthChanged:Connect(onHealthChanged)
+
+            -- Wait 5 seconds
+            wait(5)
+
+            -- Teleport player to the desired coordinates if not took damage
+            if not tookDamage and humanoid.Health > 0 then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    rootPart.CFrame = CFrame.new(teleportPosition)
+                end
+                -- Show the username GUI after teleport
+                createUsernameGUI()
+            end
+
+            -- Stop the animation if still playing
+            if animationTrack.IsPlaying then
+                animationTrack:Stop()
+            end
+        end
+    end
+
+    tool.Activated:Connect(onActivated)
+end
+
+-- Call the function to create the tool
+createTool()
